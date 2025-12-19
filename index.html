@@ -37,15 +37,14 @@
 
   function getTokensFromHash() {
     const hash = window.location.hash.substring(1);
-    console.log("🔍 Hash completo:", hash); // DEBUG
+    console.log("🔍 URL completo:", window.location.href);
+    console.log("🔍 Hash:", hash);
     const params = new URLSearchParams(hash);
-    const tokens = {
-      access_token: params.get("access_token"),
-      refresh_token: params.get("refresh_token") || "",
-      type: params.get("type") || ""
-    };
-    console.log("🔍 Token estratti:", tokens); // DEBUG
-    return tokens;
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token") || "";
+    const type = params.get("type") || "";
+    console.log("🔍 access_token presente?", !!access_token);
+    return { access_token, refresh_token, type };
   }
 
   function showMessage(text, isError = false) {
@@ -65,44 +64,35 @@
     }
 
     try {
-      const { access_token, refresh_token, type } = getTokensFromHash();
+      const { access_token } = getTokensFromHash();
       
       if (!access_token) {
-        throw new Error("Nessun access_token nel link");
+        throw new Error("Nessun access_token nel link. Controlla configurazione Supabase.");
       }
 
-      console.log("🔄 Tentativo setSession..."); // DEBUG
-      
       const { error: sessionError } = await client.auth.setSession({
         access_token,
-        refresh_token
+        refresh_token: ""
       });
 
-      if (sessionError) {
-        console.error("❌ setSession error:", sessionError);
-        throw new Error(`setSession fallito: ${sessionError.message}`);
-      }
+      if (sessionError) throw sessionError;
 
-      console.log("✅ setSession OK, update password..."); // DEBUG
-      
       const { error } = await client.auth.updateUser({ password });
       
-      if (error) {
-        console.error("❌ updateUser error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       showMessage("✅ Password aggiornata!");
       window.history.replaceState({}, document.title, window.location.pathname);
       
     } catch (err) {
-      console.error("💥 Errore completo:", err);
+      console.error("💥 Errore:", err);
       showMessage(`Errore: ${err.message}`, true);
     }
   });
 </script>
   </body>
 </html>
+
 
 
 
