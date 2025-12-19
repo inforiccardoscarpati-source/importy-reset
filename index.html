@@ -29,53 +29,78 @@
       </form>
     </div>
 
-    <script>
-      const SUPABASE_URL = "https://tuo-progetto.supabase.co"; // <-- tue chiavi
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // <-- tue chiavi
-    
-      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
-      function getAccessToken() {
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        return params.get("access_token");
+      <script>
+  const SUPABASE_URL = "https://tuo-progetto.supabase.co"; // <-- tue chiavi
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // <-- tue chiavi
+
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function getTokensFromHash() {
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    return {
+      access_token: params.get("access_token"),
+      refresh_token: params.get("refresh_token") || "",
+      type: params.get("type") || ""
+    };
+  }
+
+  function showMessage(text, isError = false) {
+    const el = document.getElementById("message");
+    el.textContent = text;
+    el.className = isError ? "error" : "success";
+  }
+
+  document.getElementById("password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const password = document.getElementById("password").value;
+    const password2 = document.getElementById("password2").value;
+
+    if (password !== password2) {
+      showMessage("Le password non coincidono.", true);
+      return;
+    }
+
+    try {
+      // 1. Estrai token dal link
+      const { access_token, refresh_token } = getTokensFromHash();
+      
+      if (!access_token) {
+        throw new Error("Link non valido o scaduto");
       }
-    
-      function showMessage(text, isError = false) {
-        const el = document.getElementById("message");
-        el.textContent = text;
-        el.className = isError ? "error" : "success";
-      }
-    
-      document.getElementById("password-form").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const password = document.getElementById("password").value;
-        const password2 = document.getElementById("password2").value;
-    
-        if (password !== password2) {
-          showMessage("Le password non coincidono.", true);
-          return;
-        }
-    
-        try {
-          // Per reset password, Supabase si autentica automaticamente dal link
-          // Basta chiamare updateUser sull'utente corrente
-          const { data, error } = await client.auth.updateUser({ password });
-    
-          if (error) throw error;
-    
-          showMessage("✅ Password aggiornata! Ora fai login in Importy.");
-          
-          // Pulisci URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-        } catch (err) {
-          console.error("Errore completo:", err);
-          showMessage(`Errore: ${err.message || "Link non valido"}`, true);
-        }
+
+      // 2. SETTA la sessione usando il token dal link
+      const { error: sessionError } = await client.auth.setSession({
+        access_token,
+        refresh_token
       });
-    </script>
+
+      if (sessionError) throw sessionError;
+
+      // 3. VERIFICA che la sessione sia attiva
+      const { data: { session } } = await client.auth.getSession();
+      if (!session) throw new Error("Sessione non attiva");
+
+      // 4. AGGIORNA password
+      const { data, error } = await client.auth.updateUser({ 
+        password 
+      });
+
+      if (error) throw error;
+
+      showMessage("✅ Password aggiornata con successo! Ora fai login in Importy.");
+      
+      // Pulisci URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+    } catch (err) {
+      console.error("Errore completo:", err);
+      showMessage(`Errore: ${err.message}`, true);
+    }
+  });
+</script>
   </body>
 </html>
+
 
 
