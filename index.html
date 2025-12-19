@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Cambia password Importy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; padding: 24px; max-width: 480px; margin: auto; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-top: 40px; }
+      input { width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 16px; }
+      button { padding: 10px 16px; cursor: pointer; }
+      .error { color: #c00; margin-top: 8px; }
+      .success { color: #080; margin-top: 8px; }
+    </style>
+    <!-- Supabase JS via CDN -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.57.4/dist/umd/supabase.js"></script>
+  </head>
+  <body>
+    <h1>Cambia password Importy</h1>
+    <div class="card">
+      <p>Imposta una nuova password per il tuo account.</p>
+      <form id="password-form">
+        <label for="password">Nuova password</label>
+        <input id="password" type="password" required minlength="8" />
+        <label for="password2">Conferma password</label>
+        <input id="password2" type="password" required minlength="8" />
+        <button type="submit">Aggiorna password</button>
+        <div id="message"></div>
+      </form>
+    </div>
+
+    <script>
+      const SUPABASE_URL = "https://TUO-PROJECT-ID.supabase.co"; // <-- cambia
+      const SUPABASE_ANON_KEY = "TUO_PUBLIC_ANON_KEY"; // <-- cambia
+
+      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // Prende l'access_token dall'hash del link (#access_token=...)
+      function getAccessTokenFromHash() {
+        const hash = window.location.hash.substring(1); // remove '#'
+        const params = new URLSearchParams(hash);
+        return params.get("access_token");
+      }
+
+      async function setSessionFromHash() {
+        const accessToken = getAccessTokenFromHash();
+        if (!accessToken) {
+          showMessage("Link non valido o scaduto. Richiedi una nuova email di reset.", true);
+          throw new Error("missing access token");
+        }
+        // opzionale: se nel link hai anche il refresh_token, puoi leggerlo allo stesso modo
+        await client.auth.setSession({
+          access_token: accessToken,
+          refresh_token: accessToken, // non sempre c'è; in molti casi basta solo access_token
+        });
+      }
+
+      function showMessage(text, isError = false) {
+        const el = document.getElementById("message");
+        el.textContent = text;
+        el.className = isError ? "error" : "success";
+      }
+
+      document.getElementById("password-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const password = document.getElementById("password").value;
+        const password2 = document.getElementById("password2").value;
+
+        if (password !== password2) {
+          showMessage("Le password non coincidono.", true);
+          return;
+        }
+
+        try {
+          await setSessionFromHash();
+
+          const { data, error } = await client.auth.updateUser({
+            password: password,
+          });
+
+          if (error) {
+            console.error(error);
+            showMessage("Errore durante l'aggiornamento della password.", true);
+            return;
+          }
+
+          showMessage("Password aggiornata con successo! Ora puoi usare questa password in Importy.");
+        } catch (err) {
+          console.error(err);
+          showMessage("Link non valido o scaduto. Richiedi una nuova email di reset.", true);
+        }
+      });
+    </script>
+  </body>
+</html>
