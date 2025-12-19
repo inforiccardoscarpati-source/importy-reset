@@ -30,19 +30,22 @@
     </div>
 
       <script>
-  const SUPABASE_URL = "https://mdavqsnduydurkmdznwh.supabase.co"; // <-- tue chiavi
-  const SUPABASE_ANON_KEY = "sb_publishable_FxYIM0vx-3-nI45QWRd5iw_kPzBI6x_"; // <-- tue chiavi
+  const SUPABASE_URL = "https://mdavqsnduydurkmdznwh.supabase.co"; 
+  const SUPABASE_ANON_KEY = "sb_publishable_FxYIM0vx-3-nI45QWRd5iw_kPzBI6x_";
 
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   function getTokensFromHash() {
     const hash = window.location.hash.substring(1);
+    console.log("🔍 Hash completo:", hash); // DEBUG
     const params = new URLSearchParams(hash);
-    return {
+    const tokens = {
       access_token: params.get("access_token"),
       refresh_token: params.get("refresh_token") || "",
       type: params.get("type") || ""
     };
+    console.log("🔍 Token estratti:", tokens); // DEBUG
+    return tokens;
   }
 
   function showMessage(text, isError = false) {
@@ -62,45 +65,45 @@
     }
 
     try {
-      // 1. Estrai token dal link
-      const { access_token, refresh_token } = getTokensFromHash();
+      const { access_token, refresh_token, type } = getTokensFromHash();
       
       if (!access_token) {
-        throw new Error("Link non valido o scaduto");
+        throw new Error("Nessun access_token nel link");
       }
 
-      // 2. SETTA la sessione usando il token dal link
+      console.log("🔄 Tentativo setSession..."); // DEBUG
+      
       const { error: sessionError } = await client.auth.setSession({
         access_token,
         refresh_token
       });
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.error("❌ setSession error:", sessionError);
+        throw new Error(`setSession fallito: ${sessionError.message}`);
+      }
 
-      // 3. VERIFICA che la sessione sia attiva
-      const { data: { session } } = await client.auth.getSession();
-      if (!session) throw new Error("Sessione non attiva");
-
-      // 4. AGGIORNA password
-      const { data, error } = await client.auth.updateUser({ 
-        password 
-      });
-
-      if (error) throw error;
-
-      showMessage("✅ Password aggiornata con successo! Ora fai login in Importy.");
+      console.log("✅ setSession OK, update password..."); // DEBUG
       
-      // Pulisci URL
+      const { error } = await client.auth.updateUser({ password });
+      
+      if (error) {
+        console.error("❌ updateUser error:", error);
+        throw error;
+      }
+
+      showMessage("✅ Password aggiornata!");
       window.history.replaceState({}, document.title, window.location.pathname);
       
     } catch (err) {
-      console.error("Errore completo:", err);
+      console.error("💥 Errore completo:", err);
       showMessage(`Errore: ${err.message}`, true);
     }
   });
 </script>
   </body>
 </html>
+
 
 
 
