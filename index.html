@@ -30,68 +30,84 @@
     </div>
 
       <script>
-  const SUPABASE_URL = "https://mdavqsnduydurkmdznwh.supabase.co"; 
-  const SUPABASE_ANON_KEY = "sb_publishable_FxYIM0vx-3-nI45QWRd5iw_kPzBI6x_";
+  const SUPABASE_URL = "https://mdavqsnduydurkmdznwh.supabase.co"; // tuo PROJECT_URL
+  const SUPABASE_ANON_KEY = "sb_publishable_FxYIM0vx-3-nI45QWRd5iw_kPzBI6x_";                  // da Settings → API
 
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  function getTokensFromHash() {
-    const hash = window.location.hash.substring(1);
-    console.log("🔍 URL completo:", window.location.href);
-    console.log("🔍 Hash:", hash);
-    const params = new URLSearchParams(hash);
-    const access_token = params.get("access_token");
-    const refresh_token = params.get("refresh_token") || "";
-    const type = params.get("type") || "";
-    console.log("🔍 access_token presente?", !!access_token);
-    return { access_token, refresh_token, type };
-  }
-
   function showMessage(text, isError = false) {
     const el = document.getElementById("message");
+    if (!el) return;
     el.textContent = text;
     el.className = isError ? "error" : "success";
   }
 
-  document.getElementById("password-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const password = document.getElementById("password").value;
-    const password2 = document.getElementById("password2").value;
+  async function verifyLinkAndMaybeShowForm() {
+    const params = new URLSearchParams(window.location.search);
+    const token_hash = params.get("token_hash");
 
-    if (password !== password2) {
+    const stepVerify = document.getElementById("step-verify");
+    const form = document.getElementById("password-form");
+
+    // Se non c'è token_hash, non siamo arrivati da email di reset
+    if (!token_hash) {
+      if (stepVerify) stepVerify.textContent = "Nessun link di reset rilevato.";
+      return;
+    }
+
+    if (stepVerify) stepVerify.textContent = "Verifica del link in corso...";
+
+    // 1) Verifica token di recovery
+    const { error } = await client.auth.verifyOtp({
+      type: "email",
+      token_hash,
+    });
+
+    if (error) {
+      console.error("verifyOtp error", error);
+      if (stepVerify) stepVerify.textContent = "Link non valido o scaduto.";
+      return;
+    }
+
+    // 2) Se ok, mostra il form password
+    if (stepVerify) stepVerify.style.display = "none";
+    if (form) form.style.display = "block";
+  }
+
+  async function handlePasswordSubmit(e) {
+    e.preventDefault();
+    const pw1 = document.getElementById("password").value;
+    const pw2 = document.getElementById("password2").value;
+
+    if (pw1 !== pw2) {
       showMessage("Le password non coincidono.", true);
       return;
     }
 
-    try {
-      const { access_token } = getTokensFromHash();
-      
-      if (!access_token) {
-        throw new Error("Nessun access_token nel link. Controlla configurazione Supabase.");
-      }
+    // 3) Cambia password per l'utente autenticato da verifyOtp
+    const { error } = await client.auth.updateUser({ password: pw1 });
 
-      const { error: sessionError } = await client.auth.setSession({
-        access_token,
-        refresh_token: ""
-      });
-
-      if (sessionError) throw sessionError;
-
-      const { error } = await client.auth.updateUser({ password });
-      
-      if (error) throw error;
-
-      showMessage("✅ Password aggiornata!");
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-    } catch (err) {
-      console.error("💥 Errore:", err);
-      showMessage(`Errore: ${err.message}`, true);
+    if (error) {
+      console.error("updateUser error", error);
+      showMessage("Errore durante l'aggiornamento della password.", true);
+      return;
     }
+
+    showMessage("Password aggiornata con successo! Ora puoi usare Importy.");
+    // opzionale: pulisci la query
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Hook iniziali
+  window.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("password-form");
+    if (form) form.addEventListener("submit", handlePasswordSubmit);
+    verifyLinkAndMaybeShowForm();
   });
 </script>
   </body>
 </html>
+
 
 
 
